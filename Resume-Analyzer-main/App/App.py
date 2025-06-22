@@ -10,6 +10,7 @@ import platform
 import geocoder
 import secrets
 import io,random
+import numpy as np
 import plotly.express as px 
 import plotly.graph_objects as go
 from geopy.geocoders import Nominatim
@@ -24,12 +25,51 @@ from streamlit_tags import st_tags
 from PIL import Image
 # pre stored data for prediction purposes
 from Courses import ds_course,web_course,android_course,ios_course,uiux_course,resume_videos,interview_videos
+from transformers import pipeline  # For BERT
+from sentence_transformers import SentenceTransformer  # For semantic similarity
+from sklearn.metrics.pairwise import cosine_similarity
 import nltk
 nltk.download('stopwords')
 
+###### Setting Page Configuration (favicon, Logo, Title) ######
+
+
+st.set_page_config(
+   page_title="Resume Analyzer",
+   page_icon='./Logo/recommend.png',
+)
+
+
+# --- NLP Models Initialization ---
+# Load BERT for role prediction (cache to avoid reloading)
+@st.cache(allow_output_mutation=True)
+def load_bert_model():
+    return pipeline("text-classification", model="Sachinkelenjaguri/resume_classifier")
+
+# Load Sentence Transformer for skill matching
+@st.cache(allow_output_mutation=True) 
+def load_sentence_model():
+    return SentenceTransformer("all-MiniLM-L6-v2")
+
+bert_classifier = load_bert_model()
+sentence_model = load_sentence_model()
+
+# --- NLP Functions ---
+def predict_role(text):
+    """Predict job role using BERT."""
+    result = bert_classifier(text[:512])  # Trim to BERT's max length
+    return result[0]["label"]  # e.g., "DATA_SCIENCE", "WEB_DEV"
+
+def semantic_skill_match(resume_skills, job_skills):
+    """Match skills using cosine similarity."""
+    # Encode skills to vectors
+    resume_emb = sentence_model.encode(resume_skills)
+    job_emb = sentence_model.encode(job_skills)
+    # Compute similarity
+    sim_matrix = cosine_similarity(resume_emb, job_emb)
+    return sim_matrix
 
 ###### Preprocessing functions ######
-
 
 # Generates a link allowing the data in a given panda dataframe to be downloaded in csv format 
 def get_csv_download_link(df,filename,text):
@@ -110,13 +150,6 @@ def insertf_data(feed_name,feed_email,feed_score,comments,Timestamp):
     connection.commit()
 
 
-###### Setting Page Configuration (favicon, Logo, Title) ######
-
-
-st.set_page_config(
-   page_title="Resume Analyzer",
-   page_icon='./Logo/recommend.png',
-)
 
 
 ###### Main function run() ######
@@ -252,6 +285,9 @@ def run():
                 except:
                     pass
                 ## Predicting Candidate Experience Level 
+                role = predict_role(resume_text)
+                st.subheader("**Role Prediction (BERT)**")
+                st.write(f"Predicted Role: **{role}**")
 
                 ### Trying with different possibilities
                 cand_level = ''
@@ -309,7 +345,9 @@ def run():
                 recommended_skills = []
                 reco_field = ''
                 rec_course = ''
-
+                
+                
+                
                 ### condition starts to check skills from keywords and predict field
                 for i in resume_data['skills']:
                 
