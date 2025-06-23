@@ -149,6 +149,52 @@ def load_css():
     </style>
     """, unsafe_allow_html=True)
 
+# Add this function with your other preprocessing functions
+def calculate_ats_score(resume_text):
+    """
+    Calculate ATS compatibility score (0-100) based on key resume factors
+    """
+    score = 0
+    
+    # 1. Keyword Optimization (30 points max)
+    keywords = ["skills", "experience", "education", "projects", 
+                "achievements", "certifications", "summary"]
+    found_keywords = [kw for kw in keywords if kw in resume_text.lower()]
+    score += min(30, (len(found_keywords)/len(keywords)*30))
+    
+    # 2. Section Presence (20 points max)
+    sections = ["work experience", "education", "skills", "contact information"]
+    found_sections = [sec for sec in sections if sec in resume_text.lower()]
+    score += min(20, (len(found_sections)/len(sections)*20))
+    
+    # 3. Length Check (10 points)
+    page_count = len(resume_text.split("\f"))  # Count page breaks
+    if 1 <= page_count <= 2:
+        score += 10
+    
+    # 4. Formatting (20 points)
+    formatting_checks = {
+        "consistent_bullets": "- " in resume_text or "* " in resume_text,
+        "consistent_dates": any(x in resume_text.lower() for x in ["present", "20", "jan", "feb"]),
+        "no_tables": "<table>" not in resume_text.lower(),
+        "standard_fonts": "times new roman" in resume_text.lower() or "arial" in resume_text.lower()
+    }
+    score += sum(5 for check in formatting_checks.values() if check)
+    
+    # 5. Contact Info (10 points)
+    contact_checks = {
+        "has_email": "@" in resume_text,
+        "has_phone": any(x in resume_text for x in ["phone", "mobile", "tel"]),
+    }
+    score += sum(5 for check in contact_checks.values() if check)
+    
+    # 6. Action Verbs (10 points)
+    action_verbs = ["managed", "led", "developed", "implemented", 
+                   "increased", "reduced", "optimized", "created"]
+    found_verbs = [verb for verb in action_verbs if verb in resume_text.lower()]
+    score += min(10, (len(found_verbs)/len(action_verbs)*10))
+    
+    return min(100, int(score))
 
 # --- NLP Models Initialization ---
 # Load BERT for role prediction (cache to avoid reloading)
@@ -283,7 +329,7 @@ def run():
     choice = st.sidebar.selectbox("Choose an option:", activities)
     
     st.sidebar.markdown("---")
-    st.sidebar.markdown("**Built with Love**")
+    st.sidebar.markdown("**Resume Analyzer**")
 
     ###### Creating Database and Table ######
 
@@ -411,7 +457,7 @@ def run():
                 role = predict_role(resume_text)
                 st.subheader("**Role Prediction (BERT)**")
                 st.write(f"Predicted Role: **{role}**")
-
+                
                 ### Trying with different possibilities
                 cand_level = ''
                 if resume_data['no_of_pages'] < 1:                
@@ -683,23 +729,80 @@ def run():
                 else:
                     st.markdown('''<h5 style='text-align: left; color: #FF0000;'>[-] Please add Projects. It will show that you have done work related the required position or not.</h4>''',unsafe_allow_html=True)
 
-                st.subheader("**Resume Score**")
+               
+                st.markdown("---")
+                st.subheader("**ATS Compatibility Score**")
+        
+                ats_score = calculate_ats_score(resume_text)
+
+                # Visual representation
+                ats_gauge = go.Figure(go.Indicator(
+                  mode="gauge+number",
+                  value=ats_score,
+                  domain={'x': [0, 1], 'y': [0, 1]},
+                  title={'text': "ATS Score", 'font': {'color': 'white'}},
+                  gauge={
+                     'axis': {'range': [None, 100], 'tickcolor': 'white'},
+                     'bar': {'color': '#0F0E47'},  # the main needle/indicator color
+                     'bgcolor': "#272757",         # gauge background
+                     'borderwidth': 2,
+                     'bordercolor': "#505081",
+                     'steps': [
+                     {'range': [0, 50], 'color': "#8686AC"},
+                     {'range': [50, 70], 'color': "#505081"},
+                     {'range': [70, 100], 'color': "#0F0E47"}
+          ],
+        'threshold': {
+            'line': {'color': 'red', 'width': 4},
+            'thickness': 0.75,
+           'value': ats_score
+                     }
+                    }
+                 ))
+
+                ats_gauge.update_layout(
+                      paper_bgcolor="#272757",
+                      font={'color': 'white', 'family': "Arial"}
+)
+                
+        
+                st.plotly_chart(ats_gauge)
+        
+        # Score interpretation
+                if ats_score >= 80:
+                  st.markdown(f"""
+<div class="info-card success-card">
+    <p style="margin: 0.5rem 0 0 0;">Excellent ATS optimization! Your resume should pass most automated screenings.</p>
+</div>
+""", unsafe_allow_html=True)
+                elif ats_score >= 60:
+                  st.markdown(f"""
+<div class="info-card success-card">
+    <p style="margin: 0.5rem 0 0 0;">Good ATS optimization, but could be improved in some areas.</p>
+</div>
+""", unsafe_allow_html=True)
+                else:
+                  st.markdown(f"""
+<div class="info-card success-card">
+    <p style="margin: 0.5rem 0 0 0;">Low ATS optimization detected. Consider restructuring your resume.</p>
+</div>
+""", unsafe_allow_html=True)
+            
+        # Improvement tips
+                with st.expander("How to improve your ATS score"):
+                  st.markdown("""
+            - **Use standard section headers**: "Work Experience", "Education", "Skills"
+            - **Include relevant keywords** from the job description
+            - **Avoid tables and graphics** that ATS can't read
+            - **Use bullet points** for readability
+            - **Include measurable achievements** (e.g., "Increased sales by 20%")
+            - **Keep length** to 1-2 pages
+            - **Use standard fonts** like Arial or Times New Roman
+            """)
+
                 
 
-                ### Score Bar
-                my_bar = st.progress(0)
-                score = 0
-                for percent_complete in range(resume_score):
-                    score +=1
-                    time.sleep(0.1)
-                    my_bar.progress(percent_complete + 1)
-
-                ### Score
-                st.success('** Your Resume Writing Score: ' + str(score)+'**')
-                st.warning("** Note: This score is calculated based on the content that you have in your Resume. **")
-
-                # print(str(sec_token), str(ip_add), (host_name), (dev_user), (os_name_ver), (latlong), (city), (state), (country), (act_name), (act_mail), (act_mob), resume_data['name'], resume_data['email'], str(resume_score), timestamp, str(resume_data['no_of_pages']), reco_field, cand_level, str(resume_data['skills']), str(recommended_skills), str(rec_course), pdf_name)
-
+                
 
                 ### Getting Current Date and Time
                 ts = time.time()
@@ -804,7 +907,7 @@ def run():
         </p><br/><br/>
 
         <p align="justify">
-            Built with 🤍
+            Resume Analyzer
         </p>
 
         ''',unsafe_allow_html=True)  
