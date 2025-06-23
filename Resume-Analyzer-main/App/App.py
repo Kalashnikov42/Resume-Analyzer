@@ -37,7 +37,117 @@ nltk.download('stopwords')
 st.set_page_config(
    page_title="Resume Analyzer",
    page_icon='./Logo/recommend.png',
+   layout="wide",
+   initial_sidebar_state="expanded"
 )
+
+def load_css():
+    st.markdown("""
+    <style>
+    :root {
+        --primary-color: #505081;
+        --secondary-color: #8686AC;
+        --accent-color: #0F0E47;
+        --text-color: #FFFFFF;
+        --bg-color: #272757;
+        --card-bg: #2E2E4D;
+        --input-bg: #1E1E3F;
+        --input-border: #8686AC;
+    }
+
+    #MainMenu, footer, header { visibility: hidden; }
+
+    .main .block-container {
+        padding-top: 2rem;
+        padding-bottom: 2rem;
+        background-color: var(--bg-color);
+        color: var(--text-color);
+    }
+
+    h1, h2, h3, h4, h5, h6 {
+        color: var(--primary-color) !important;
+    }
+
+    .stMarkdown, .stText, p, div, span, label {
+        color: var(--text-color) !important;
+    }
+
+    .custom-header {
+        background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
+        padding: 2rem;
+        border-radius: 10px;
+        margin-bottom: 2rem;
+        text-align: center;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+    }
+
+    .custom-header h1,
+    .custom-header p {
+        color: white !important;
+    }
+
+    .info-card {
+        background-color: var(--card-bg);
+        padding: 1.5rem;
+        border-radius: 10px;
+        border-left: 4px solid var(--secondary-color);
+        margin: 1rem 0;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+        color: var(--text-color);
+    }
+
+    .stTextInput > div > div > input,
+    .stSelectbox > div > div > select,
+    .stTextArea > div > textarea {
+        background-color: var(--input-bg);
+        color: var(--text-color) !important;
+        border: 1px solid var(--input-border);
+        border-radius: 6px;
+    }
+
+    .stFileUploader > div {
+        background-color: var(--input-bg);
+        border: 1px dashed var(--input-border);
+        color: var(--text-color) !important;
+    }
+
+    .stButton > button {
+        background: linear-gradient(135deg, var(--primary-color), var(--accent-color));
+        color: white !important;
+        border: none;
+        border-radius: 8px;
+        padding: 0.5rem 1rem;
+        font-weight: 600;
+        transition: 0.3s ease;
+    }
+
+    .stButton > button:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+    }
+
+    .css-1d391kg {
+        background: linear-gradient(180deg, var(--primary-color), var(--accent-color));
+    }
+
+    .css-1d391kg .css-1v0mbdj, 
+    .css-1d391kg .css-1v0mbdj label,
+    .css-1d391kg .stMarkdown, 
+    .css-1d391kg p, 
+    .css-1d391kg div {
+        color: white !important;
+    }
+
+    .metric-card {
+        background: var(--card-bg);
+        padding: 1rem;
+        border-radius: 8px;
+        text-align: center;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+        border-top: 3px solid var(--accent-color);
+    }
+    </style>
+    """, unsafe_allow_html=True)
 
 
 # --- NLP Models Initialization ---
@@ -156,16 +266,24 @@ def insertf_data(feed_name,feed_email,feed_score,comments,Timestamp):
 
 
 def run():
+    # Load custom CSS
+    load_css()
     
-    # (Logo, Heading, Sidebar etc)
-    img = Image.open('./Logo/RESUM.png')
-    st.image(img)
-    st.sidebar.markdown("# Choose Something...")
+    # Custom header
+    st.markdown("""
+    <div class="custom-header">
+        <h1>Resume Analyzer</h1>
+        <p>Get intelligent insights and recommendations for your resume</p>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    # Sidebar with improved styling
+    st.sidebar.markdown("### Navigation")
     activities = ["User", "Feedback", "About", "Admin"]
-    choice = st.sidebar.selectbox("Choose among the given options:", activities)
-    link = '<b>Built with 🤍 </b>' 
-    st.sidebar.markdown(link, unsafe_allow_html=True)
+    choice = st.sidebar.selectbox("Choose an option:", activities)
     
+    st.sidebar.markdown("---")
+    st.sidebar.markdown("**Built with Love**")
 
     ###### Creating Database and Table ######
 
@@ -273,7 +391,12 @@ def run():
 
                 ## Showing Analyzed data from (resume_data)
                 st.header("**Resume Analysis**")
-                st.success("Hello "+ resume_data['name'])
+                st.markdown(f"""
+<div class="info-card success-card">
+    <h3 style="color: var(--success-color); margin: 0;">Welcome, {resume_data['name']}!</h3>
+    <p style="margin: 0.5rem 0 0 0;">Your resume has been successfully analyzed.</p>
+</div>
+""", unsafe_allow_html=True)
                 st.subheader("**Basic Information**")
                 try:
                     st.text('Name: '+resume_data['name'])
@@ -355,7 +478,11 @@ def run():
                     if i.lower() in ds_keyword:
                         print(i.lower())
                         reco_field = 'Data Science'
-                        st.success("**Our analysis says you are looking for Data Science Jobs.**")
+                        st.markdown(f"""
+<div class="info-card success-card">
+    <p style="margin: 0.5rem 0 0 0;">Our analysis says you are looking for Data Science Jobs.</p>
+</div>
+""", unsafe_allow_html=True)
                         recommended_skills = ['Data Visualization','Predictive Analysis','Statistical Modeling','Data Mining','Clustering & Classification','Data Analytics','Quantitative Analysis','Web Scraping','ML Algorithms','Keras','Pytorch','Probability','Scikit-learn','Tensorflow',"Flask",'Streamlit']
                         recommended_keywords = st_tags(label='### Recommended skills for you.',
                         text='Recommended skills generated from System',value=recommended_skills,key = '2')
@@ -368,7 +495,11 @@ def run():
                     elif i.lower() in web_keyword:
                         print(i.lower())
                         reco_field = 'Web Development'
-                        st.success("** Our analysis says you are looking for Web Development Jobs **")
+                        st.markdown(f"""
+<div class="info-card success-card">
+    <p style="margin: 0.5rem 0 0 0;">Our analysis says you are looking for Web Development Jobs.</p>
+</div>
+""", unsafe_allow_html=True)
                         recommended_skills = ['React','Django','Node JS','React JS','php','laravel','Magento','wordpress','Javascript','Angular JS','c#','Flask','SDK']
                         recommended_keywords = st_tags(label='### Recommended skills for you.',
                         text='Recommended skills generated from System',value=recommended_skills,key = '3')
@@ -381,7 +512,11 @@ def run():
                     elif i.lower() in android_keyword:
                         print(i.lower())
                         reco_field = 'Android Development'
-                        st.success("** Our analysis says you are looking for Android App Development Jobs **")
+                        st.markdown(f"""
+<div class="info-card success-card">
+    <p style="margin: 0.5rem 0 0 0;"> Our analysis says you are looking for Android App Development Jobs.</p>
+</div>
+""", unsafe_allow_html=True)
                         recommended_skills = ['Android','Android development','Flutter','Kotlin','XML','Java','Kivy','GIT','SDK','SQLite']
                         recommended_keywords = st_tags(label='### Recommended skills for you.',
                         text='Recommended skills generated from System',value=recommended_skills,key = '4')
@@ -394,7 +529,11 @@ def run():
                     elif i.lower() in ios_keyword:
                         print(i.lower())
                         reco_field = 'IOS Development'
-                        st.success("** Our analysis says you are looking for IOS App Development Jobs **")
+                        st.markdown(f"""
+<div class="info-card success-card">
+    <p style="margin: 0.5rem 0 0 0;"> Our analysis says you are looking for IOS App Development Jobs </p>
+</div>
+""", unsafe_allow_html=True)
                         recommended_skills = ['IOS','IOS Development','Swift','Cocoa','Cocoa Touch','Xcode','Objective-C','SQLite','Plist','StoreKit',"UI-Kit",'AV Foundation','Auto-Layout']
                         recommended_keywords = st_tags(label='### Recommended skills for you.',
                         text='Recommended skills generated from System',value=recommended_skills,key = '5')
@@ -407,7 +546,11 @@ def run():
                     elif i.lower() in uiux_keyword:
                         print(i.lower())
                         reco_field = 'UI-UX Development'
-                        st.success("** Our analysis says you are looking for UI-UX Development Jobs **")
+                        st.markdown(f"""
+<div class="info-card success-card">
+    <p style="margin: 0.5rem 0 0 0;"> Our analysis says you are looking for UI-UX Development Jobs </p>
+</div>
+""", unsafe_allow_html=True)
                         recommended_skills = ['UI','User Experience','Adobe XD','Figma','Zeplin','Balsamiq','Prototyping','Wireframes','Storyframes','Adobe Photoshop','Editing','Illustrator','After Effects','Premier Pro','Indesign','Wireframe','Solid','Grasp','User Research']
                         recommended_keywords = st_tags(label='### Recommended skills for you.',
                         text='Recommended skills generated from System',value=recommended_skills,key = '6')
@@ -542,15 +685,6 @@ def run():
 
                 st.subheader("**Resume Score**")
                 
-                st.markdown(
-                    """
-                    <style>
-                        .stProgress > div > div > div > div {
-                            background-color: #d73b5c;
-                        }
-                    </style>""",
-                    unsafe_allow_html=True,
-                )
 
                 ### Score Bar
                 my_bar = st.progress(0)
@@ -618,7 +752,7 @@ def run():
                 ## Success Message 
                 st.success("Thanks! Your Feedback was recorded.") 
                 ## On Successful Submit
-                st.balloons()    
+              #  st.balloons()    
 
 
         # query to fetch data from user feedback table
