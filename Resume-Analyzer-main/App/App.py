@@ -3,35 +3,32 @@ import streamlit as st
 import pandas as pd
 import base64, random
 import time,datetime
-import pymysql
+import pymysql  # type: ignore
 import os
 import socket
 import platform
-import geocoder
+import geocoder # type: ignore
 import secrets
 import io,random
 import numpy as np
-import plotly.express as px 
-import plotly.graph_objects as go
-from geopy.geocoders import Nominatim
+import plotly.express as px  # type: ignore
+import plotly.graph_objects as go # type: ignore
+from geopy.geocoders import Nominatim # type: ignore
 # libraries used to parse the pdf files
-from pyresparser import ResumeParser
-from pdfminer3.layout import LAParams, LTTextBox
-from pdfminer3.pdfpage import PDFPage
-from pdfminer3.pdfinterp import PDFResourceManager
-from pdfminer3.pdfinterp import PDFPageInterpreter
-from pdfminer3.converter import TextConverter
-from streamlit_tags import st_tags
+from pyresparser import ResumeParser # type: ignore
+from streamlit_tags import st_tags # type: ignore
 from PIL import Image
 # pre stored data for prediction purposes
 from Courses import ds_course,web_course,android_course,ios_course,uiux_course,resume_videos,interview_videos
 from transformers import pipeline  # For BERT
-from sentence_transformers import SentenceTransformer  # For semantic similarity
+from sentence_transformers import SentenceTransformer # type: ignore
 from sklearn.metrics.pairwise import cosine_similarity
-import nltk
+import nltk # type: ignore
 nltk.download('stopwords')
+from UI import load_css    #type: ignore
+from ATS import calculate_ats_score  #type: ignore
+from configs import get_csv_download_link, pdf_reader , show_pdf , course_recommender
 
-###### Setting Page Configuration (favicon, Logo, Title) ######
 
 
 st.set_page_config(
@@ -41,244 +38,51 @@ st.set_page_config(
    initial_sidebar_state="expanded"
 )
 
-def load_css():
-    st.markdown("""
-    <style>
-    :root {
-        --primary-color: #505081;
-        --secondary-color: #8686AC;
-        --accent-color: #0F0E47;
-        --text-color: #FFFFFF;
-        --bg-color: #272757;
-        --card-bg: #2E2E4D;
-        --input-bg: #1E1E3F;
-        --input-border: #8686AC;
-    }
 
-    #MainMenu, footer, header { visibility: hidden; }
-
-    .main .block-container {
-        padding-top: 2rem;
-        padding-bottom: 2rem;
-        background-color: var(--bg-color);
-        color: var(--text-color);
-    }
-
-    h1, h2, h3, h4, h5, h6 {
-        color: var(--primary-color) !important;
-    }
-
-    .stMarkdown, .stText, p, div, span, label {
-        color: var(--text-color) !important;
-    }
-
-    .custom-header {
-        background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
-        padding: 2rem;
-        border-radius: 10px;
-        margin-bottom: 2rem;
-        text-align: center;
-        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
-    }
-
-    .custom-header h1,
-    .custom-header p {
-        color: white !important;
-    }
-
-    .info-card {
-        background-color: var(--card-bg);
-        padding: 1.5rem;
-        border-radius: 10px;
-        border-left: 4px solid var(--secondary-color);
-        margin: 1rem 0;
-        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
-        color: var(--text-color);
-    }
-
-    .stTextInput > div > div > input,
-    .stSelectbox > div > div > select,
-    .stTextArea > div > textarea {
-        background-color: var(--input-bg);
-        color: var(--text-color) !important;
-        border: 1px solid var(--input-border);
-        border-radius: 6px;
-    }
-
-    .stFileUploader > div {
-        background-color: var(--input-bg);
-        border: 1px dashed var(--input-border);
-        color: var(--text-color) !important;
-    }
-
-    .stButton > button {
-        background: linear-gradient(135deg, var(--primary-color), var(--accent-color));
-        color: white !important;
-        border: none;
-        border-radius: 8px;
-        padding: 0.5rem 1rem;
-        font-weight: 600;
-        transition: 0.3s ease;
-    }
-
-    .stButton > button:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
-    }
-
-    .css-1d391kg {
-        background: linear-gradient(180deg, var(--primary-color), var(--accent-color));
-    }
-
-    .css-1d391kg .css-1v0mbdj, 
-    .css-1d391kg .css-1v0mbdj label,
-    .css-1d391kg .stMarkdown, 
-    .css-1d391kg p, 
-    .css-1d391kg div {
-        color: white !important;
-    }
-
-    .metric-card {
-        background: var(--card-bg);
-        padding: 1rem;
-        border-radius: 8px;
-        text-align: center;
-        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
-        border-top: 3px solid var(--accent-color);
-    }
-    </style>
-    """, unsafe_allow_html=True)
-
-# Add this function with your other preprocessing functions
-def calculate_ats_score(resume_text):
-    """
-    Calculate ATS compatibility score (0-100) based on key resume factors
-    """
-    score = 0
-    
-    # 1. Keyword Optimization (30 points max)
-    keywords = ["skills", "experience", "education", "projects", 
-                "achievements", "certifications", "summary"]
-    found_keywords = [kw for kw in keywords if kw in resume_text.lower()]
-    score += min(30, (len(found_keywords)/len(keywords)*30))
-    
-    # 2. Section Presence (20 points max)
-    sections = ["work experience", "education", "skills", "contact information"]
-    found_sections = [sec for sec in sections if sec in resume_text.lower()]
-    score += min(20, (len(found_sections)/len(sections)*20))
-    
-    # 3. Length Check (10 points)
-    page_count = len(resume_text.split("\f"))  # Count page breaks
-    if 1 <= page_count <= 2:
-        score += 10
-    
-    # 4. Formatting (20 points)
-    formatting_checks = {
-        "consistent_bullets": "- " in resume_text or "* " in resume_text,
-        "consistent_dates": any(x in resume_text.lower() for x in ["present", "20", "jan", "feb"]),
-        "no_tables": "<table>" not in resume_text.lower(),
-        "standard_fonts": "times new roman" in resume_text.lower() or "arial" in resume_text.lower()
-    }
-    score += sum(5 for check in formatting_checks.values() if check)
-    
-    # 5. Contact Info (10 points)
-    contact_checks = {
-        "has_email": "@" in resume_text,
-        "has_phone": any(x in resume_text for x in ["phone", "mobile", "tel"]),
-    }
-    score += sum(5 for check in contact_checks.values() if check)
-    
-    # 6. Action Verbs (10 points)
-    action_verbs = ["managed", "led", "developed", "implemented", 
-                   "increased", "reduced", "optimized", "created"]
-    found_verbs = [verb for verb in action_verbs if verb in resume_text.lower()]
-    score += min(10, (len(found_verbs)/len(action_verbs)*10))
-    
-    return min(100, int(score))
+# BERT label to role mapping - updated with your specific labels
+ROLE_LABELS = {
+    'LABEL_0': 'Advocate',
+    'LABEL_1': 'Arts',
+    'LABEL_2': 'Automation Testing',
+    'LABEL_3': 'Blockchain',
+    'LABEL_4': 'Business Analyst',
+    'LABEL_5': 'Civil Engineer',
+    'LABEL_6': 'Data Science',
+    'LABEL_7': 'Database',
+    'LABEL_8': 'DevOps Engineer',
+    'LABEL_9': 'DotNet Developer',
+    'LABEL_10': 'ETL Developer',
+    'LABEL_11': 'Electrical Engineering',
+    'LABEL_12': 'HR',
+    'LABEL_13': 'Hadoop',
+    'LABEL_14': 'Health and fitness',
+    'LABEL_15': 'Java Developer',
+    'LABEL_16': 'Mechanical Engineer',
+    'LABEL_17': 'Network Security Engineer',
+    'LABEL_18': 'Operations Manager',
+    'LABEL_19': 'PMO',
+    'LABEL_20': 'Python Developer',
+    'LABEL_21': 'SAP Developer',
+    'LABEL_22': 'Sales',
+    'LABEL_23': 'Testing',
+    'LABEL_24': 'Web Designing'
+}
 
 # --- NLP Models Initialization ---
 # Load BERT for role prediction (cache to avoid reloading)
 @st.cache(allow_output_mutation=True)
 def load_bert_model():
-    return pipeline("text-classification", model="Sachinkelenjaguri/resume_classifier")
+    return pipeline("text-classification", model="kalashnikov42/resume_classifier")
 
-# Load Sentence Transformer for skill matching
-@st.cache(allow_output_mutation=True) 
-def load_sentence_model():
-    return SentenceTransformer("all-MiniLM-L6-v2")
 
 bert_classifier = load_bert_model()
-sentence_model = load_sentence_model()
 
 # --- NLP Functions ---
 def predict_role(text):
     """Predict job role using BERT."""
     result = bert_classifier(text[:512])  # Trim to BERT's max length
-    return result[0]["label"]  # e.g., "DATA_SCIENCE", "WEB_DEV"
-
-def semantic_skill_match(resume_skills, job_skills):
-    """Match skills using cosine similarity."""
-    # Encode skills to vectors
-    resume_emb = sentence_model.encode(resume_skills)
-    job_emb = sentence_model.encode(job_skills)
-    # Compute similarity
-    sim_matrix = cosine_similarity(resume_emb, job_emb)
-    return sim_matrix
-
-###### Preprocessing functions ######
-
-# Generates a link allowing the data in a given panda dataframe to be downloaded in csv format 
-def get_csv_download_link(df,filename,text):
-    csv = df.to_csv(index=False)
-    ## bytes conversions
-    b64 = base64.b64encode(csv.encode()).decode()      
-    href = f'<a href="data:file/csv;base64,{b64}" download="{filename}">{text}</a>'
-    return href
-
-
-# Reads Pdf file and check_extractable
-def pdf_reader(file):
-    resource_manager = PDFResourceManager()
-    fake_file_handle = io.StringIO()
-    converter = TextConverter(resource_manager, fake_file_handle, laparams=LAParams())
-    page_interpreter = PDFPageInterpreter(resource_manager, converter)
-    with open(file, 'rb') as fh:
-        for page in PDFPage.get_pages(fh,
-                                      caching=True,
-                                      check_extractable=True):
-            page_interpreter.process_page(page)
-            print(page)
-        text = fake_file_handle.getvalue()
-
-    ## close open handles
-    converter.close()
-    fake_file_handle.close()
-    return text
-
-
-# show uploaded file path to view pdf_display
-def show_pdf(file_path):
-    with open(file_path, "rb") as f:
-        base64_pdf = base64.b64encode(f.read()).decode('utf-8')
-    pdf_display = F'<iframe src="data:application/pdf;base64,{base64_pdf}" width="700" height="1000" type="application/pdf"></iframe>'
-    st.markdown(pdf_display, unsafe_allow_html=True)
-
-
-# course recommendations which has data already loaded from Courses.py
-def course_recommender(course_list):
-    st.subheader("**Courses & Certificates Recommendations**")
-    c = 0
-    rec_course = []
-    ## slider to choose from range 1-10
-    no_of_reco = st.slider('Choose Number of Course Recommendations:', 1, 10, 5)
-    random.shuffle(course_list)
-    for c_name, c_link in course_list:
-        c += 1
-        st.markdown(f"({c}) [{c_name}]({c_link})")
-        rec_course.append(c_name)
-        if c == no_of_reco:
-            break
-    return rec_course
+    label = result[0]["label"]
+    return ROLE_LABELS.get(label , "Unknkown Role")  # e.g., "DATA_SCIENCE", "WEB_DEV"
 
 
 # sql connector
@@ -457,7 +261,7 @@ def run():
                 role = predict_role(resume_text)
                 st.subheader("**Role Prediction (BERT)**")
                 st.write(f"Predicted Role: **{role}**")
-                
+                st.subheader("**Experience Level**")
                 ### Trying with different possibilities
                 cand_level = ''
                 if resume_data['no_of_pages'] < 1:                
@@ -800,10 +604,6 @@ def run():
             - **Use standard fonts** like Arial or Times New Roman
             """)
 
-                
-
-                
-
                 ### Getting Current Date and Time
                 ts = time.time()
                 cur_date = datetime.datetime.fromtimestamp(ts).strftime('%Y-%m-%d')
@@ -814,19 +614,40 @@ def run():
                 ## Calling insert_data to add all the data into user_data                
                 insert_data(str(sec_token), str(ip_add), (host_name), (dev_user), (os_name_ver), (latlong), (city), (state), (country), (act_name), (act_mail), (act_mob), resume_data['name'], resume_data['email'], str(resume_score), timestamp, str(resume_data['no_of_pages']), reco_field, cand_level, str(resume_data['skills']), str(recommended_skills), str(rec_course), pdf_name)
 
-                ## Recommending Resume Writing Video
-                st.header("**Bonus Video for Resume Writing Tips**")
+                
+                # Bonus videos section (compact & horizontal)
+                st.markdown("---")
+                st.subheader("Bonus Resources")
+
+                st.markdown("""
+                     <style>
+                    .video-container {
+                        display: flex;
+                        gap: 10px;
+                        margin-bottom: 10px;
+                    }
+                    .video-wrapper {
+                        flex: 1;
+                        max-width: 25%;
+                    }
+                    </style>
+                    """, unsafe_allow_html=True)
+
+                # Horizontal video layout
                 resume_vid = random.choice(resume_videos)
-                st.video(resume_vid)
-
-                ## Recommending Interview Preparation Video
-                st.header("**Bonus Video for Interview Tips**")
                 interview_vid = random.choice(interview_videos)
-                st.video(interview_vid)
 
-                ## On Successful Result 
-                st.balloons()
+                st.markdown('<div class="video-container">', unsafe_allow_html=True)
+                st.markdown('<div class="video-wrapper">', unsafe_allow_html=True)
+                st.markdown("**Resume Writing Tips**")
+                st.video(resume_vid, format="video/mp4", start_time=0)
+                st.markdown('</div>', unsafe_allow_html=True)
 
+                st.markdown('<div class="video-wrapper">', unsafe_allow_html=True)
+                st.markdown("**Interview Tips**")
+                st.video(interview_vid, format="video/mp4", start_time=0)
+                st.markdown('</div>', unsafe_allow_html=True)
+                st.markdown('</div>', unsafe_allow_html=True)
             else:
                 st.error('Something went wrong..')                
 
@@ -853,9 +674,7 @@ def run():
                 ## Calling insertf_data to add dat into user feedback
                 insertf_data(feed_name,feed_email,feed_score,comments,Timestamp)    
                 ## Success Message 
-                st.success("Thanks! Your Feedback was recorded.") 
-                ## On Successful Submit
-              #  st.balloons()    
+                st.success("Thanks! Your Feedback was recorded.")    
 
 
         # query to fetch data from user feedback table
