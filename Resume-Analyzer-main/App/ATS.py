@@ -1,5 +1,4 @@
 
-# Add this function with your other preprocessing functions
 def calculate_ats_score(resume_text):
     """
     Calculate ATS compatibility score (0-100) based on key resume factors
